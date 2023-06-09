@@ -3951,6 +3951,8 @@ MonoBehaviour:
   jumpForce: 20
   upwardsGravity: 80
   downwardsGravity: 100
+  apexVelocityThreshold: 1
+  apexVelocityMultiplier: 2
   coyoteTime: 0.1
   jumpBuffer: 0.1
   jumpReleaseMultiplier: 0.5

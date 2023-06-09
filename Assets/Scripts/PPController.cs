@@ -13,6 +13,8 @@ public class PPController : MonoBehaviour
 
     public delegate void Collision(Collider2D collider);
 
+    public LayerMask GetSolidMask() => solidMask;
+
     private void Awake()
     {
         Physics2D.autoSyncTransforms = true; // because we use physics for collision checking
@@ -30,7 +32,7 @@ public class PPController : MonoBehaviour
             {
                 Vector3 collisionCheckOffset = Vector2.right * moveDir * pixelSize;
                 Vector2 point = coll.bounds.center + collisionCheckOffset;
-                Collider2D hit = CollisionHelper.CheckColliderAtPoint(coll, point, solidMask);
+                Collider2D hit = CollisionHelper.CheckColliderUnitOffset(coll, Vector2.right * moveDir, solidMask);
                 if (hit != null)
                 {
                     if (!hasLeniency || !LeniencyCheckAndMove(point, Vector2.up))
@@ -56,7 +58,7 @@ public class PPController : MonoBehaviour
             {
                 Vector3 collisionCheckOffset = Vector2.up * moveDir * pixelSize;
                 Vector2 point = coll.bounds.center + collisionCheckOffset;
-                Collider2D hit = CollisionHelper.CheckColliderAtPoint(coll, point, solidMask);
+                Collider2D hit = CollisionHelper.CheckColliderUnitOffset(coll, Vector2.up * moveDir, solidMask);
                 if (hit != null)
                 {
                     bool shouldTryLenient = hasLeniencyUp && amount > 0 || hasLeniencyDown && amount < 0;
@@ -71,24 +73,6 @@ public class PPController : MonoBehaviour
             movementCounter.y -= moveDir * pixelSize;
             transform.Translate(Vector2.up * moveDir * pixelSize);
         }
-    }
-
-    private void Update()
-    {
-        Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
-
-        MoveH(input.x * 5 * Time.deltaTime, onCollide: OnCollideH);
-        MoveV(input.y * 5 * Time.deltaTime, onCollide: OnCollideV);
-    }
-
-    private void OnCollideH(Collider2D hit)
-    {
-        //Debug.Log("Horizontally hit " + hit.name);
-    }
-
-    private void OnCollideV(Collider2D hit)
-    {
-        //Debug.Log("Vertically hit " + hit.name);
     }
 
     private bool LeniencyCheckAndMove(Vector2 origin, Vector2 leniencyDirection)

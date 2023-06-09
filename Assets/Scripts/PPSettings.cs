@@ -1,7 +1,6 @@
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "PPSettings", menuName = "ScriptableObjects/PPSettings", order = 1)]
-public class PPSettings : ScriptableObject
+public class PPSettings
 {
-    public int pixelsPerUnit;
+    public static int PIXELS_PER_UNIT = 8;
 }

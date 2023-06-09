@@ -3,23 +3,24 @@ using UnityEngine;
 [RequireComponent(typeof(BoxCollider2D))]
 public class PPController : MonoBehaviour
 {
-    [SerializeField] private PPSettings ppSettings;
     [SerializeField] private LayerMask solidMask;
 
     private Vector2 movementCounter;
     private float pixelSize;
     private BoxCollider2D coll;
 
+    private const int MOVE_LENIENCY = 2; // pixels you can slip by when clipping a lip
+
     public delegate void Collision(Collider2D collider);
 
     private void Awake()
     {
         Physics2D.autoSyncTransforms = true; // because we use physics for collision checking
-        pixelSize = 1f / ppSettings.pixelsPerUnit;
+        pixelSize = 1f / PPSettings.PIXELS_PER_UNIT;
         coll = GetComponent<BoxCollider2D>();
     }
 
-    public void MoveH(float amount, bool collideSolids = true, Collision onCollide = null)
+    public void MoveH(float amount, bool collideSolids = true, Collision onCollide = null, bool hasLeniency = true)
     {
         movementCounter.x += amount;
         float moveDir = Mathf.Sign(amount);
@@ -28,13 +29,16 @@ public class PPController : MonoBehaviour
             if (collideSolids)
             {
                 Vector3 collisionCheckOffset = Vector2.right * moveDir * pixelSize;
-                Vector2 colliderBounds = (Vector2)coll.bounds.size - Vector2.one * pixelSize;
-                Collider2D hit = Physics2D.OverlapBox(coll.bounds.center + collisionCheckOffset, colliderBounds, 0, solidMask);
+                Vector2 point = coll.bounds.center + collisionCheckOffset;
+                Collider2D hit = CollisionHelper.CheckColliderAtPoint(coll, point, solidMask);
                 if (hit != null)
                 {
-                    movementCounter.x = 0;
-                    onCollide(hit);
-                    return;
+                    if (!hasLeniency || !LeniencyCheckAndMove(point, Vector2.up))
+                    {
+                        movementCounter.x = 0;
+                        onCollide(hit);
+                        return;
+                    }
                 }
             }
             movementCounter.x -= moveDir * pixelSize;
@@ -42,7 +46,7 @@ public class PPController : MonoBehaviour
         }
     }
 
-    public void MoveV(float amount, bool collideSolids = true, Collision onCollide = null)
+    public void MoveV(float amount, bool collideSolids = true, Collision onCollide = null, bool hasLeniency = true)
     {
         movementCounter.y += amount;
         float moveDir = Mathf.Sign(amount);
@@ -51,13 +55,16 @@ public class PPController : MonoBehaviour
             if (collideSolids)
             {
                 Vector3 collisionCheckOffset = Vector2.up * moveDir * pixelSize;
-                Vector2 colliderBounds = (Vector2)coll.bounds.size - Vector2.one * pixelSize;
-                Collider2D hit = Physics2D.OverlapBox(coll.bounds.center + collisionCheckOffset, colliderBounds, 0, solidMask);
+                Vector2 point = coll.bounds.center + collisionCheckOffset;
+                Collider2D hit = CollisionHelper.CheckColliderAtPoint(coll, point, solidMask);
                 if (hit != null)
                 {
-                    movementCounter.y = 0;
-                    onCollide(hit);
-                    return;
+                    if (!hasLeniency || !LeniencyCheckAndMove(point, Vector2.right))
+                    {
+                        movementCounter.y = 0;
+                        onCollide(hit);
+                        return;
+                    }
                 }
             }
             movementCounter.y -= moveDir * pixelSize;
@@ -69,17 +76,36 @@ public class PPController : MonoBehaviour
     {
         Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
 
-        MoveH(input.x * 10 * Time.deltaTime, true, OnCollideH);
-        MoveV(input.y * 10 * Time.deltaTime, true, OnCollideV);
+        MoveH(input.x * 10 * Time.deltaTime, onCollide: OnCollideH);
+        MoveV(input.y * 10 * Time.deltaTime, onCollide: OnCollideV);
     }
 
     private void OnCollideH(Collider2D hit)
     {
-        Debug.Log("Horizontally hit " + hit.name);
+        //Debug.Log("Horizontally hit " + hit.name);
     }
 
     private void OnCollideV(Collider2D hit)
     {
-        Debug.Log("Vertically hit " + hit.name);
+        //Debug.Log("Vertically hit " + hit.name);
+    }
+
+    private bool LeniencyCheckAndMove(Vector2 origin, Vector2 leniencyDirection)
+    {
+        Vector2 unit = leniencyDirection * pixelSize;
+        for (int i = -1; i <= 1; i += 2)
+        {
+            for (int j = 1; j <= MOVE_LENIENCY; j++)
+            {
+                bool canMoveThere = CollisionHelper.CheckColliderAtPoint(coll, origin + unit * i * j, solidMask) == null;
+                if (canMoveThere)
+                {
+                    // move leniently
+                    transform.Translate(unit * i * j);
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

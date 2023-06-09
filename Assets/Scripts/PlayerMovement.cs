@@ -11,6 +11,8 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float jumpForce = 20;
     [SerializeField] private float upwardsGravity = 80;
     [SerializeField] private float downwardsGravity = 100;
+    [SerializeField] private float apexVelocityThreshold = 10;
+    [SerializeField] private float apexVelocityMultiplier = 15;
     [Header("Leniency")]
     [SerializeField] private float coyoteTime = 0.1f;
     [SerializeField] private float jumpBuffer = 0.1f;
@@ -43,10 +45,10 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
+        float horizontalMaxSpeed = topSpeed;
         float horizontalInput = Input.GetAxisRaw("Horizontal");
 
-        velocity = new Vector2(horizontalInput * topSpeed, velocity.y);
-
+        // increment counters
         timeSinceGrounded += Time.deltaTime;
         timeSinceJumpInput += Time.deltaTime;
 
@@ -58,8 +60,10 @@ public class PlayerMovement : MonoBehaviour
             gravity = downwardsGravity;
         }
 
+        // get jump buffer
         if (Input.GetKeyDown(KeyCode.Space)) timeSinceJumpInput = 0;
 
+        // variable jump height
         if (jumping && !hasReleasedJump && Input.GetKeyUp(KeyCode.Space) && velocity.y > 0)
         {
             velocity.y *= jumpReleaseMultiplier;
@@ -76,10 +80,22 @@ public class PlayerMovement : MonoBehaviour
             velocity.y -= gravity * Time.deltaTime;
         }
 
+        // jump if within coyote/jump buffer
         if (timeSinceGrounded < coyoteTime && timeSinceJumpInput < jumpBuffer)
         {
             Jump();
         }
+
+        // apex multiplier
+        // TODO: add acceleration manipulation as well
+        if (jumping && Mathf.Abs(velocity.y) <= apexVelocityThreshold)
+        {
+            horizontalMaxSpeed *= apexVelocityMultiplier;
+        }
+
+        // set x velocity
+        // TODO: add acceleration values
+        velocity = new Vector2(horizontalInput * horizontalMaxSpeed, velocity.y);
 
         if (velocity.x != 0)
         {

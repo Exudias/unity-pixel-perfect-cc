@@ -20,7 +20,7 @@ public class PPController : MonoBehaviour
         coll = GetComponent<BoxCollider2D>();
     }
 
-    public void MoveH(float amount, bool collideSolids = true, Collision onCollide = null, bool hasLeniency = true)
+    public void MoveH(float amount, bool collideSolids = true, Collision onCollide = null, bool hasLeniency = false)
     {
         movementCounter.x += amount;
         float moveDir = Mathf.Sign(amount);
@@ -46,7 +46,7 @@ public class PPController : MonoBehaviour
         }
     }
 
-    public void MoveV(float amount, bool collideSolids = true, Collision onCollide = null, bool hasLeniency = true)
+    public void MoveV(float amount, bool collideSolids = true, Collision onCollide = null, bool hasLeniencyUp = true, bool hasLeniencyDown = false)
     {
         movementCounter.y += amount;
         float moveDir = Mathf.Sign(amount);
@@ -59,7 +59,8 @@ public class PPController : MonoBehaviour
                 Collider2D hit = CollisionHelper.CheckColliderAtPoint(coll, point, solidMask);
                 if (hit != null)
                 {
-                    if (!hasLeniency || !LeniencyCheckAndMove(point, Vector2.right))
+                    bool shouldTryLenient = hasLeniencyUp && amount > 0 || hasLeniencyDown && amount < 0;
+                    if (!shouldTryLenient || !LeniencyCheckAndMove(point, Vector2.right))
                     {
                         movementCounter.y = 0;
                         onCollide(hit);
@@ -76,8 +77,8 @@ public class PPController : MonoBehaviour
     {
         Vector2 input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
 
-        MoveH(input.x * 10 * Time.deltaTime, onCollide: OnCollideH);
-        MoveV(input.y * 10 * Time.deltaTime, onCollide: OnCollideV);
+        MoveH(input.x * 5 * Time.deltaTime, onCollide: OnCollideH);
+        MoveV(input.y * 5 * Time.deltaTime, onCollide: OnCollideV);
     }
 
     private void OnCollideH(Collider2D hit)

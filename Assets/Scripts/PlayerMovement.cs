@@ -1,73 +1,98 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(PPController))]
 public class PlayerMovement : MonoBehaviour
 {
+    #region Serialized Variables
     [Header("Horizontal Movement")]
     [SerializeField] private float topSpeed = 10;
+    [SerializeField] private float acceleration = 50;
+    [SerializeField] private float deceleration = 100;
     [Header("Vertical Movement")]
     [SerializeField] private float jumpForce = 20;
     [SerializeField] private float upwardsGravity = 80;
     [SerializeField] private float downwardsGravity = 100;
-    [SerializeField] private float apexVelocityThreshold = 10;
-    [SerializeField] private float apexVelocityMultiplier = 15;
+    [SerializeField] private float apexVelocityThreshold = 0;
+    [SerializeField] private float apexVelocityMultiplier = 1;
+    [SerializeField] private float apexAccelMultiplier = 1;
+    [SerializeField] private float apexGravityMultiplier = 1;
     [Header("Leniency")]
     [SerializeField] private float coyoteTime = 0.1f;
     [SerializeField] private float jumpBuffer = 0.1f;
     [SerializeField] private float jumpReleaseMultiplier = 0.5f;
+    #endregion
 
-    private float timeSinceGrounded;
-    private float timeSinceJumpInput;
-    
+    #region Private Variables
     private LayerMask solidMask;
     private Vector2 velocity;
 
+    // Leniency variables
+    private float timeSinceGrounded;
+    private float timeSinceJumpInput;
+
+    // References
     private BoxCollider2D coll;
     private PPController controller;
 
+    // Jumping variables
     private bool grounded;
     private bool jumping;
     private bool hasReleasedJump;
+    #endregion
+
+    #region MonoBehaviour Functions
+    private void Awake()
+    {
+        GetLocalComponents();
+    }
 
     private void Start()
     {
-        coll = GetComponent<BoxCollider2D>();
-        controller = GetComponent<PPController>();
         solidMask = controller.GetSolidMask();
-        grounded = false;
-        jumping = false;
-        hasReleasedJump = false;
-        timeSinceGrounded = Mathf.Infinity;
-        timeSinceJumpInput = Mathf.Infinity;
+        InitializeVariables();
     }
 
     private void Update()
     {
-        float horizontalMaxSpeed = topSpeed;
         float horizontalInput = Input.GetAxisRaw("Horizontal");
 
-        // increment counters
-        timeSinceGrounded += Time.deltaTime;
-        timeSinceJumpInput += Time.deltaTime;
+        // Initialize values so they may be modified by certain conditions
+        float currentMaxHorizontalSpeed = topSpeed;
+        float currentAcceleration = acceleration;
+        float currentGravity = upwardsGravity;
 
-        float gravity = upwardsGravity;
+        bool shouldDecelerate = horizontalInput == 0 || horizontalInput * velocity.x < 0;
+        if (shouldDecelerate)
+        {
+            currentAcceleration = deceleration;
+        }
+
+        IncrementCounters();
 
         if (velocity.y <= 0)
         {
             GroundCheck();
-            gravity = downwardsGravity;
+            currentGravity = downwardsGravity; // for better control feel, higher grav downwards
         }
 
         // get jump buffer
+        // TODO: unhardcode jump keybind
         if (Input.GetKeyDown(KeyCode.Space)) timeSinceJumpInput = 0;
 
-        // variable jump height
-        if (jumping && !hasReleasedJump && Input.GetKeyUp(KeyCode.Space) && velocity.y > 0)
+        bool shouldCutJumpShort = jumping && !hasReleasedJump && Input.GetKeyUp(KeyCode.Space) && velocity.y > 0;
+        if (shouldCutJumpShort)
         {
             velocity.y *= jumpReleaseMultiplier;
             hasReleasedJump = true;
+        }
+
+        // for more control at apex of jump
+        bool shouldApplyApexMultiplier = jumping && Mathf.Abs(velocity.y) <= apexVelocityThreshold;
+        if (shouldApplyApexMultiplier)
+        {
+            currentMaxHorizontalSpeed *= apexVelocityMultiplier;
+            currentAcceleration *= apexAccelMultiplier;
+            currentGravity *= apexGravityMultiplier;
         }
 
         if (grounded)
@@ -77,25 +102,18 @@ public class PlayerMovement : MonoBehaviour
         }
         else
         {
-            velocity.y -= gravity * Time.deltaTime;
+            velocity.y -= currentGravity * Time.deltaTime;
         }
 
-        // jump if within coyote/jump buffer
+        // jump if within coyote and jump is buffered
         if (timeSinceGrounded < coyoteTime && timeSinceJumpInput < jumpBuffer)
         {
             Jump();
         }
 
-        // apex multiplier
-        // TODO: add acceleration manipulation as well
-        if (jumping && Mathf.Abs(velocity.y) <= apexVelocityThreshold)
-        {
-            horizontalMaxSpeed *= apexVelocityMultiplier;
-        }
-
-        // set x velocity
-        // TODO: add acceleration values
-        velocity = new Vector2(horizontalInput * horizontalMaxSpeed, velocity.y);
+        // accelerate towards desired velocity
+        // TODO: add different values for accel when above top speed
+        velocity.x = Mathf.MoveTowards(velocity.x, horizontalInput * currentMaxHorizontalSpeed, currentAcceleration * Time.deltaTime);
 
         if (velocity.x != 0)
         {
@@ -106,20 +124,18 @@ public class PlayerMovement : MonoBehaviour
             controller.MoveV(velocity.y * Time.deltaTime, onCollide: OnCollideV);
         }
     }
+    #endregion
 
+    #region Movement & Collision
     private void Jump()
     {
+        velocity.y = jumpForce;
+
         jumping = true;
         grounded = false;
         hasReleasedJump = false;
-        velocity.y = jumpForce;
         timeSinceGrounded = Mathf.Infinity;
         timeSinceJumpInput = Mathf.Infinity;
-    }
-
-    private void GroundCheck()
-    {
-        grounded = CollisionHelper.CheckColliderUnitOffset(coll, Vector2.down, solidMask) != null;
     }
 
     private void OnCollideH(Collider2D hit)
@@ -131,4 +147,33 @@ public class PlayerMovement : MonoBehaviour
     {
         velocity.y = 0;
     }
+
+    private void GroundCheck()
+    {
+        grounded = CollisionHelper.CheckColliderUnitOffset(coll, Vector2.down, solidMask) != null;
+    }
+    #endregion
+
+    #region Utility
+    private void GetLocalComponents()
+    {
+        coll = GetComponent<BoxCollider2D>();
+        controller = GetComponent<PPController>();
+    }
+
+    private void InitializeVariables()
+    {
+        grounded = false;
+        jumping = false;
+        hasReleasedJump = false;
+        timeSinceGrounded = Mathf.Infinity;
+        timeSinceJumpInput = Mathf.Infinity;
+    }
+
+    private void IncrementCounters()
+    {
+        timeSinceGrounded += Time.deltaTime;
+        timeSinceJumpInput += Time.deltaTime;
+    }
+    #endregion
 }

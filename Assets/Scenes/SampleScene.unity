@@ -3956,6 +3956,7 @@ MonoBehaviour:
   apexVelocityThreshold: 1
   apexVelocityMultiplier: 1.3
   apexAccelMultiplier: 1.1
+  apexGravityMultiplier: 0.5
   coyoteTime: 0.1
   jumpBuffer: 0.1
   jumpReleaseMultiplier: 0.5

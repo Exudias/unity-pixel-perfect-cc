@@ -8,6 +8,8 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float topSpeed = 10;
     [SerializeField] private float acceleration = 50;
     [SerializeField] private float deceleration = 100;
+    [SerializeField] private float pastMaxAccelerationMultiplier = 0.5f;
+    [SerializeField] private float airControlMultiplier = 0.5f;
     [Header("Vertical Movement")]
     [SerializeField] private float jumpForce = 20;
     [SerializeField] private float upwardsGravity = 80;
@@ -16,6 +18,8 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float apexVelocityMultiplier = 1;
     [SerializeField] private float apexAccelMultiplier = 1;
     [SerializeField] private float apexGravityMultiplier = 1;
+    [SerializeField] private float maxFallSpeed = -10f;
+    [SerializeField] private float pastMaxFallSpeedDeceleration = 150;
     [Header("Leniency")]
     [SerializeField] private float coyoteTime = 0.1f;
     [SerializeField] private float jumpBuffer = 0.1f;
@@ -76,7 +80,6 @@ public class PlayerMovement : MonoBehaviour
         }
 
         // get jump buffer
-        // TODO: unhardcode jump keybind
         if (Input.GetKeyDown(KeyCode.Space)) timeSinceJumpInput = 0;
 
         bool shouldCutJumpShort = jumping && !hasReleasedJump && Input.GetKeyUp(KeyCode.Space) && velocity.y > 0;
@@ -102,7 +105,17 @@ public class PlayerMovement : MonoBehaviour
         }
         else
         {
-            velocity.y -= currentGravity * Time.deltaTime;
+            currentAcceleration *= airControlMultiplier; // dampen acceleration mid-air
+
+            // clamp natural falling speed
+            if (velocity.y > maxFallSpeed)
+            {
+                velocity.y = Mathf.Max(velocity.y - currentGravity * Time.deltaTime, maxFallSpeed);
+            }
+            else
+            {
+                velocity.y = Mathf.MoveTowards(velocity.y, maxFallSpeed, pastMaxFallSpeedDeceleration * Time.deltaTime);
+            }
         }
 
         // jump if within coyote and jump is buffered
@@ -111,8 +124,12 @@ public class PlayerMovement : MonoBehaviour
             Jump();
         }
 
-        // accelerate towards desired velocity
-        // TODO: add different values for accel when above top speed
+        // accelerate towards desired velocity, with multiplier when above top speed
+        if (Mathf.Abs(velocity.x) > currentMaxHorizontalSpeed)
+        {
+            currentAcceleration *= pastMaxAccelerationMultiplier;
+        }
+
         velocity.x = Mathf.MoveTowards(velocity.x, horizontalInput * currentMaxHorizontalSpeed, currentAcceleration * Time.deltaTime);
 
         if (velocity.x != 0)
